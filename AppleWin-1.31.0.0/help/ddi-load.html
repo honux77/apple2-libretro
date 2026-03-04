@@ -1,0 +1,68 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+  <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+  <title>Loading Disk Images</title>
+
+
+</head>
+
+
+<body style="background-color: rgb(255, 255, 255); font-family: verdana;" alink="#008000" link="#008000" vlink="#008000">
+
+<h2 style="color: rgb(0, 128, 0);">Loading
+Disk Images</h2>
+
+<hr size="4">
+<p>AppleWin registers<sub style="FONT-WEIGHT: bold">1</sub> the
+following file types as "Disk
+Images": *.do, *.dsk, *.nib, *.po and *.woz.&nbsp; Double-clicking
+a disk image in Windows Explorer will automatically load and boot
+the disk.
+While older versions of
+AppleWin started a new
+instance of the emulator for every disk started in this manner, current
+versions
+of the emulator will simply replace the current disk (and reboot) if there is an
+instance of
+the emulator already running.</p>
+
+<p>You may also drag and drop a
+disk image from an Explorer
+window to the AppleWin emulator window to load and boot the
+disk.&nbsp; Dropping the image exactly on one of the drive buttons
+will insert
+it only into this drive
+without booting.&nbsp; For
+example: drop "Pascal1.dsk" to drive 1 and "Pascal2.dsk" to
+drive 2, then click the the Run button to bring up UCSD Pascal.</p>
+
+<p>AppleWin now allows you to
+open a disk as read-only.&nbsp;
+To do this, click the checkbox for "Open as Read Only" in the Select
+Disk Image dialog.&nbsp; This works like the physical
+write-protection mechanism on a real Apple //e floppy disk.</p>
+
+<p>If a Disk Image name is too
+long to read in the Toolbar,
+simply pause the mouse cursor over a drive button to get a
+tool-tip with the full name.</p>
+
+<p>Under the vertical Toolbar, are 2 LEDs, one for each floppy disk drive. The colors indicate drive status:
+	<li>Black: drive is off
+	<li>Green: drive is reading
+	<li>Red: drive is writing
+	<li>Orange: drive is reading (and floppy is write-protected)
+</p>
+
+<p>By default the Disk II Controller card has the 16-sector firmware (as used by DOS 3.3 and ProDOS). But if a WOZ image that internally identifies as 13-sector format (eg. DOS 3.2) is put into drive 1, then from the start-up/logo screen (or the next reset), the Disk II Controller card's firmware will automatically be switched to the old 13-sector firmware, allowing the disk to boot. And it will automatically switch back if a non-13-sector WOZ (or any non-WOZ) image is put into drive 1 and the machine is reset.<br>
+NB. There is no support for this feature for non-WOZ images.
+</p>
+
+<p><sub style="FONT-WEIGHT: bold">1</sub>&nbsp;To register the file types in Windows Vista, Windows 7, Windows 10 and Windows 11,
+you will need to run AppleWin with elevated privileges. This only needs to be done once.
+Right click the AppleWin.exe icon and select 'Run as Administrator'.</p>
+
+</body>
+</html>

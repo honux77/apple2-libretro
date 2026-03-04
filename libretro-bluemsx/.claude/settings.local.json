@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gcc:*)",
+      "Bash(pacman:*)",
+      "Bash(choco:*)",
+      "Bash(export:*)",
+      "Bash(ls Makefile*:*)"
+    ]
+  }
+}
