@@ -33,8 +33,8 @@ RETRO_API void retro_set_environment(retro_environment_t cb)
 {
     environ_cb = cb;
 
-    // Inform frontend we can run without game
-    bool no_game = false;
+    // Can run without a disk (boots to Applesoft BASIC prompt)
+    bool no_game = true;
     cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
 }
 
