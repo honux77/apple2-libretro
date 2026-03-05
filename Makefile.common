@@ -1,0 +1,106 @@
+CORE_DIR ?= .
+LIBRETRO_COMM_DIR := $(CORE_DIR)/libretro-common
+APPLE2_SRC_DIR := $(CORE_DIR)/src/apple2core
+LIBRETRO_SRC_DIR := $(CORE_DIR)/src/libretro
+
+COREDEFINES := -D__LIBRETRO__ -DAPPLE2_LIBRETRO -DHAVE_CONFIG_H
+
+LIBYAML_DIR  := $(CORE_DIR)/AppleWin-1.31.0.0/libyaml
+MINIZIP_DIR  := $(CORE_DIR)/AppleWin-1.31.0.0/minizip
+
+INCFLAGS := \
+	-I$(CORE_DIR) \
+	-I$(LIBRETRO_COMM_DIR)/include \
+	-I$(LIBRETRO_SRC_DIR) \
+	-I$(APPLE2_SRC_DIR) \
+	-I$(APPLE2_SRC_DIR)/Configuration \
+	-I$(LIBYAML_DIR)/include \
+	-I$(CORE_DIR)/AppleWin-1.31.0.0
+
+# Phase 2: libretro adapter + AppleWin core sources
+SOURCES_CXX := $(CORE_DIR)/libretro.cpp \
+	$(LIBRETRO_SRC_DIR)/libretro_bridge.cpp \
+	$(LIBRETRO_SRC_DIR)/libretro_audio.cpp \
+	$(LIBRETRO_SRC_DIR)/libretro_input.cpp \
+	$(LIBRETRO_SRC_DIR)/LibretroFrame.cpp \
+	$(LIBRETRO_SRC_DIR)/LibretroPropertySheet.cpp \
+	$(LIBRETRO_SRC_DIR)/LibretroVideo.cpp \
+	$(APPLE2_SRC_DIR)/6522.cpp \
+	$(APPLE2_SRC_DIR)/6821.cpp \
+	$(APPLE2_SRC_DIR)/AY8910.cpp \
+	$(APPLE2_SRC_DIR)/CPU.cpp \
+	$(APPLE2_SRC_DIR)/Card.cpp \
+	$(APPLE2_SRC_DIR)/CardManager.cpp \
+	$(APPLE2_SRC_DIR)/CmdLine.cpp \
+	$(APPLE2_SRC_DIR)/CopyProtectionDongles.cpp \
+	$(APPLE2_SRC_DIR)/Core.cpp \
+	$(APPLE2_SRC_DIR)/Disk.cpp \
+	$(APPLE2_SRC_DIR)/Disk2CardManager.cpp \
+	$(APPLE2_SRC_DIR)/DiskFormatTrack.cpp \
+	$(APPLE2_SRC_DIR)/DiskImage.cpp \
+	$(APPLE2_SRC_DIR)/DiskImageHelper.cpp \
+	$(APPLE2_SRC_DIR)/FourPlay.cpp \
+	$(APPLE2_SRC_DIR)/FrameBase.cpp \
+	$(APPLE2_SRC_DIR)/Harddisk.cpp \
+	$(APPLE2_SRC_DIR)/Joystick.cpp \
+	$(APPLE2_SRC_DIR)/Keyboard.cpp \
+	$(APPLE2_SRC_DIR)/LanguageCard.cpp \
+	$(APPLE2_SRC_DIR)/Log.cpp \
+	$(APPLE2_SRC_DIR)/Memory.cpp \
+	$(APPLE2_SRC_DIR)/Mockingboard.cpp \
+	$(APPLE2_SRC_DIR)/MockingboardCardManager.cpp \
+	$(APPLE2_SRC_DIR)/MouseInterface.cpp \
+	$(APPLE2_SRC_DIR)/NTSC.cpp \
+	$(APPLE2_SRC_DIR)/NTSC_CharSet.cpp \
+	$(APPLE2_SRC_DIR)/NoSlotClock.cpp \
+	$(APPLE2_SRC_DIR)/ParallelPrinter.cpp \
+	$(APPLE2_SRC_DIR)/Peripheral_Clock_Generic.cpp \
+	$(APPLE2_SRC_DIR)/Peripheral_Clock_ThunderClockPlus.cpp \
+	$(APPLE2_SRC_DIR)/Pravets.cpp \
+	$(APPLE2_SRC_DIR)/ProDOS_Utils.cpp \
+	$(APPLE2_SRC_DIR)/RGBMonitor.cpp \
+	$(APPLE2_SRC_DIR)/Registry.cpp \
+	$(APPLE2_SRC_DIR)/Riff.cpp \
+	$(APPLE2_SRC_DIR)/SAM.cpp \
+	$(APPLE2_SRC_DIR)/SNESMAX.cpp \
+	$(APPLE2_SRC_DIR)/SSI263.cpp \
+	$(APPLE2_SRC_DIR)/SaveState.cpp \
+	$(APPLE2_SRC_DIR)/SerialComms.cpp \
+	$(APPLE2_SRC_DIR)/SoundCore.cpp \
+	$(APPLE2_SRC_DIR)/Speaker.cpp \
+	$(APPLE2_SRC_DIR)/Speech.cpp \
+	$(APPLE2_SRC_DIR)/StdAfx.cpp \
+	$(APPLE2_SRC_DIR)/StrFormat.cpp \
+	$(APPLE2_SRC_DIR)/SynchronousEventManager.cpp \
+	$(APPLE2_SRC_DIR)/Tape.cpp \
+	$(APPLE2_SRC_DIR)/Uthernet1.cpp \
+	$(APPLE2_SRC_DIR)/Uthernet2.cpp \
+	$(APPLE2_SRC_DIR)/Utilities.cpp \
+	$(APPLE2_SRC_DIR)/VidHD.cpp \
+	$(APPLE2_SRC_DIR)/Video.cpp \
+	$(APPLE2_SRC_DIR)/YamlHelper.cpp \
+	$(APPLE2_SRC_DIR)/z80emu.cpp \
+	$(APPLE2_SRC_DIR)/Configuration/Config.cpp \
+	$(APPLE2_SRC_DIR)/Configuration/PropertySheetHelper.cpp \
+	$(APPLE2_SRC_DIR)/Z80VICE/z80.cpp \
+	$(APPLE2_SRC_DIR)/Z80VICE/z80mem.cpp \
+	$(APPLE2_SRC_DIR)/Z80VICE/daa.cpp \
+	$(APPLE2_SRC_DIR)/Tfe/NetworkBackend.cpp \
+	$(APPLE2_SRC_DIR)/Tfe/PCapBackend.cpp \
+	$(APPLE2_SRC_DIR)/Tfe/tfearch.cpp \
+	$(APPLE2_SRC_DIR)/Tfe/tfesupp.cpp \
+	$(APPLE2_SRC_DIR)/Tfe/DNS.cpp \
+	$(APPLE2_SRC_DIR)/Tfe/IPRaw.cpp
+
+SOURCES_C := \
+	$(LIBYAML_DIR)/src/api.c \
+	$(LIBYAML_DIR)/src/dumper.c \
+	$(LIBYAML_DIR)/src/emitter.c \
+	$(LIBYAML_DIR)/src/loader.c \
+	$(LIBYAML_DIR)/src/parser.c \
+	$(LIBYAML_DIR)/src/reader.c \
+	$(LIBYAML_DIR)/src/scanner.c \
+	$(LIBYAML_DIR)/src/writer.c \
+	$(MINIZIP_DIR)/ioapi.c \
+	$(MINIZIP_DIR)/unzip.c \
+	$(MINIZIP_DIR)/zip.c

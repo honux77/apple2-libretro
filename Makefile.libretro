@@ -1,0 +1,114 @@
+TARGET_NAME := apple2
+CXXFLAGS := -std=c++14
+GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
+ifneq ($(GIT_VERSION)," unknown")
+	CXXFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+endif
+
+DEBUG   = 0
+SOURCES_CXX :=
+LIBS    := -lz -lpcap -lpthread
+
+ifeq ($(platform),)
+	platform = unix
+	ifeq ($(shell uname -a),)
+		platform = win
+	else ifneq ($(findstring MINGW,$(shell uname -a)),)
+		platform = win
+	else ifneq ($(findstring Darwin,$(shell uname -a)),)
+		platform = osx
+	else ifneq ($(findstring win,$(shell uname -a)),)
+		platform = win
+	endif
+endif
+
+system_platform = unix
+ifeq ($(shell uname -a),)
+	EXE_EXT = .exe
+	system_platform = win
+else ifneq ($(findstring Darwin,$(shell uname -a)),)
+	system_platform = osx
+else ifneq ($(findstring MINGW,$(shell uname -a)),)
+	system_platform = win
+endif
+
+# Unix
+ifneq (,$(findstring unix,$(platform)))
+	TARGET := $(TARGET_NAME)_libretro.so
+	fpic := -fPIC
+	SHARED := -shared -Wl,-version-script=link.T -Wl,-no-undefined
+
+# OS X
+else ifeq ($(platform), osx)
+	TARGET := $(TARGET_NAME)_libretro.dylib
+	fpic := -fPIC
+	SHARED := -dynamiclib
+
+# Raspberry Pi 1
+else ifeq ($(platform), rpi1)
+	TARGET := $(TARGET_NAME)_libretro.so
+	fpic = -fPIC
+	SHARED := -shared -Wl,-version-script=link.T -Wl,-no-undefined
+	PLATFORM_DEFINES += -marm -mfpu=vfp -mfloat-abi=hard -march=armv6j -DARM
+
+# Raspberry Pi 2
+else ifeq ($(platform), rpi2)
+	TARGET := $(TARGET_NAME)_libretro.so
+	fpic = -fPIC
+	SHARED := -shared -Wl,-version-script=link.T -Wl,-no-undefined
+	PLATFORM_DEFINES += -marm -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard -DARM
+
+# Raspberry Pi 3
+else ifeq ($(platform), rpi3)
+	TARGET := $(TARGET_NAME)_libretro.so
+	fpic = -fPIC
+	SHARED := -shared -Wl,-version-script=link.T -Wl,-no-undefined
+	PLATFORM_DEFINES += -marm -mcpu=cortex-a53 -mfpu=neon-fp-armv8 -mfloat-abi=hard -DARM
+
+# Windows
+else
+	TARGET := $(TARGET_NAME)_libretro.dll
+	CC ?= gcc
+	CXX ?= g++
+	SHARED := -shared -static-libgcc -static-libstdc++ -Wl,-no-undefined -Wl,-version-script=link.T
+
+endif
+
+CORE_DIR := .
+
+ifeq ($(DEBUG), 1)
+	CXXFLAGS += -O0 -g
+else
+	CXXFLAGS += -O2 -DNDEBUG
+endif
+
+include Makefile.common
+
+DEFINES := $(PLATFORM_DEFINES) $(COREDEFINES)
+
+CXXFLAGS += $(fpic) $(DEFINES) -w
+CFLAGS   += $(fpic) $(DEFINES) -w
+
+OBJS += $(SOURCES_CXX:.cpp=.o)
+OBJS += $(SOURCES_C:.c=.o)
+
+INCDIRS := $(INCFLAGS)
+
+LD = $(CXX)
+
+%.o: %.cpp
+	$(CXX) -c -o $@ $< $(CXXFLAGS) $(INCDIRS)
+
+%.o: %.c
+	$(CC) -c -o $@ $< $(CFLAGS) $(INCDIRS)
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(LD) -o $@ $(SHARED) $(OBJS) $(LDFLAGS) $(LIBS)
+
+clean:
+	rm -f $(OBJS)
+	rm -f $(TARGET)
+
+.PHONY: all clean

@@ -1,0 +1,184 @@
+// Apple II libretro core
+// libretro adapter layer
+
+#include "libretro-common/include/libretro.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+
+// libretro callbacks
+static retro_video_refresh_t video_cb = nullptr;
+static retro_audio_sample_t audio_cb = nullptr;
+static retro_audio_sample_batch_t audio_batch_cb = nullptr;
+static retro_environment_t environ_cb = nullptr;
+static retro_input_poll_t input_poll_cb = nullptr;
+static retro_input_state_t input_state_cb = nullptr;
+
+// Forward declarations (Phase 2+)
+namespace Apple2Core {
+    bool Init(const char* system_dir);
+    void Destroy();
+    bool LoadDisk(const char* path);
+    void RunFrame();
+    const uint32_t* GetFramebuffer();
+    unsigned GetWidth();
+    unsigned GetHeight();
+}
+
+// -------------------------------------------------------------------------
+// libretro API
+// -------------------------------------------------------------------------
+
+RETRO_API void retro_set_environment(retro_environment_t cb)
+{
+    environ_cb = cb;
+
+    // Inform frontend we can run without game
+    bool no_game = false;
+    cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
+}
+
+RETRO_API void retro_set_video_refresh(retro_video_refresh_t cb) { video_cb = cb; }
+RETRO_API void retro_set_audio_sample(retro_audio_sample_t cb) { audio_cb = cb; }
+RETRO_API void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; }
+RETRO_API void retro_set_input_poll(retro_input_poll_t cb) { input_poll_cb = cb; }
+RETRO_API void retro_set_input_state(retro_input_state_t cb) { input_state_cb = cb; }
+
+RETRO_API void retro_init(void)
+{
+    // Set pixel format
+    retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+    if (environ_cb)
+        environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
+
+    const char* system_dir = nullptr;
+    if (environ_cb)
+        environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
+
+    Apple2Core::Init(system_dir ? system_dir : ".");
+}
+
+RETRO_API void retro_deinit(void)
+{
+    Apple2Core::Destroy();
+}
+
+RETRO_API unsigned retro_api_version(void)
+{
+    return RETRO_API_VERSION;
+}
+
+RETRO_API void retro_get_system_info(struct retro_system_info* info)
+{
+    memset(info, 0, sizeof(*info));
+    info->library_name     = "Apple II";
+    info->library_version  = "1.0";
+    info->valid_extensions = "dsk|do|po|nib|woz|2mg|img|gz|hdv";
+    info->need_fullpath    = true;
+    info->block_extract    = false;
+}
+
+RETRO_API void retro_get_system_av_info(struct retro_system_av_info* info)
+{
+    memset(info, 0, sizeof(*info));
+    info->geometry.base_width   = Apple2Core::GetWidth();
+    info->geometry.base_height  = Apple2Core::GetHeight();
+    info->geometry.max_width    = Apple2Core::GetWidth();
+    info->geometry.max_height   = Apple2Core::GetHeight();
+    info->geometry.aspect_ratio = (float)Apple2Core::GetWidth() / (float)Apple2Core::GetHeight();
+    info->timing.fps            = 60.0;
+    info->timing.sample_rate    = 44100.0;
+}
+
+RETRO_API void retro_set_controller_port_device(unsigned port, unsigned device)
+{
+    (void)port;
+    (void)device;
+}
+
+RETRO_API void retro_reset(void)
+{
+    // TODO Phase 2: Reset CPU / memory
+}
+
+RETRO_API void retro_run(void)
+{
+    if (input_poll_cb)
+        input_poll_cb();
+
+    // Process input (Phase 6)
+    // extern void libretro_input_update(retro_input_state_t cb);
+    // libretro_input_update(input_state_cb);
+
+    // Run one video frame worth of emulation (Phase 2)
+    Apple2Core::RunFrame();
+
+    // Send video frame
+    if (video_cb)
+    {
+        const uint32_t* fb = Apple2Core::GetFramebuffer();
+        unsigned w = Apple2Core::GetWidth();
+        unsigned h = Apple2Core::GetHeight();
+        video_cb(fb, w, h, w * sizeof(uint32_t));
+    }
+
+    // Send audio (Phase 5)
+    // extern size_t libretro_audio_flush(retro_audio_sample_batch_t cb);
+    // libretro_audio_flush(audio_batch_cb);
+}
+
+RETRO_API size_t retro_serialize_size(void)
+{
+    return 0; // TODO Phase 2: save state
+}
+
+RETRO_API bool retro_serialize(void* data, size_t size)
+{
+    (void)data; (void)size;
+    return false;
+}
+
+RETRO_API bool retro_unserialize(const void* data, size_t size)
+{
+    (void)data; (void)size;
+    return false;
+}
+
+RETRO_API void retro_cheat_reset(void) {}
+RETRO_API void retro_cheat_set(unsigned index, bool enabled, const char* code)
+{
+    (void)index; (void)enabled; (void)code;
+}
+
+RETRO_API bool retro_load_game(const struct retro_game_info* game)
+{
+    if (game && game->path)
+        return Apple2Core::LoadDisk(game->path);
+    return true; // no game = boot to BASIC prompt
+}
+
+RETRO_API bool retro_load_game_special(unsigned game_type,
+    const struct retro_game_info* info, size_t num_info)
+{
+    (void)game_type; (void)info; (void)num_info;
+    return false;
+}
+
+RETRO_API void retro_unload_game(void) {}
+
+RETRO_API unsigned retro_get_region(void)
+{
+    return RETRO_REGION_NTSC;
+}
+
+RETRO_API void* retro_get_memory_data(unsigned id)
+{
+    (void)id;
+    return nullptr;
+}
+
+RETRO_API size_t retro_get_memory_size(unsigned id)
+{
+    (void)id;
+    return 0;
+}
