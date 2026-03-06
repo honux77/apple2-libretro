@@ -669,8 +669,15 @@ static inline DWORD GetFileAttributes(LPCSTR lpFileName)
 #define FILE_SHARE_READ  0x00000001
 #define FILE_SHARE_WRITE 0x00000002
 
-static inline DWORD SetFilePointer(HANDLE /*hFile*/, LONG /*lDistanceToMove*/,
-    PLONG /*lpDistanceToMoveHigh*/, DWORD /*dwMoveMethod*/) { return INVALID_SET_FILE_POINTER; }
+static inline DWORD SetFilePointer(HANDLE hFile, LONG lDistanceToMove,
+    PLONG /*lpDistanceToMoveHigh*/, DWORD dwMoveMethod)
+{
+    int fd = (int)(intptr_t)hFile;
+    if (fd < 0) return INVALID_SET_FILE_POINTER;
+    int whence = (dwMoveMethod == 0) ? SEEK_SET : (dwMoveMethod == 1) ? SEEK_CUR : SEEK_END;
+    off_t pos = lseek(fd, lDistanceToMove, whence);
+    return (pos == (off_t)-1) ? INVALID_SET_FILE_POINTER : (DWORD)pos;
+}
 
 static inline BOOL DeleteFile(LPCSTR /*lpFileName*/) { return FALSE; }
 static inline BOOL MoveFile(LPCSTR /*lpExistingFileName*/, LPCSTR /*lpNewFileName*/) { return FALSE; }
@@ -835,7 +842,7 @@ typedef OVERLAPPED* LPOVERLAPPED;
 #define MB_APPLMODAL         0x00000000L
 
 // -----------------------------------------------------------------------
-// File I/O stubs
+// File I/O - POSIX implementation of Windows file API
 // -----------------------------------------------------------------------
 #define GENERIC_READ         0x80000000L
 #define GENERIC_WRITE        0x40000000L
@@ -845,18 +852,43 @@ typedef OVERLAPPED* LPOVERLAPPED;
 #define TRUNCATE_EXISTING    5
 #define FILE_FLAG_OVERLAPPED     0x40000000
 
-static inline HANDLE CreateFile(LPCSTR lpFileName, DWORD /*dwDesiredAccess*/,
+#include <fcntl.h>
+
+// Pack fd into HANDLE (INVALID_HANDLE_VALUE == (void*)-1, fd==-1 maps naturally)
+static inline HANDLE _fd_to_handle(int fd) { return (HANDLE)(intptr_t)fd; }
+static inline int    _handle_to_fd(HANDLE h) { return (int)(intptr_t)h; }
+
+static inline HANDLE CreateFile(LPCSTR lpFileName, DWORD dwDesiredAccess,
     DWORD /*dwShareMode*/, LPSECURITY_ATTRIBUTES /*lpSecurityAttributes*/,
-    DWORD /*dwCreationDisposition*/, DWORD /*dwFlagsAndAttributes*/,
+    DWORD dwCreationDisposition, DWORD /*dwFlagsAndAttributes*/,
     HANDLE /*hTemplateFile*/)
 {
-    (void)lpFileName;
-    return INVALID_HANDLE_VALUE;
+    int flags = 0;
+    bool canRead  = (dwDesiredAccess & GENERIC_READ)  != 0;
+    bool canWrite = (dwDesiredAccess & GENERIC_WRITE) != 0;
+    if (canRead && canWrite) flags = O_RDWR;
+    else if (canWrite)       flags = O_WRONLY;
+    else                     flags = O_RDONLY;
+
+    switch (dwCreationDisposition) {
+    case CREATE_NEW:       flags |= O_CREAT | O_EXCL;            break;
+    case CREATE_ALWAYS:    flags |= O_CREAT | O_TRUNC;           break;
+    case OPEN_EXISTING:    /* no extra flags */                   break;
+    case TRUNCATE_EXISTING:flags |= O_TRUNC;                     break;
+    default:               flags |= O_CREAT;                     break;
+    }
+
+    int fd = open(lpFileName, flags, 0666);
+    return _fd_to_handle(fd);
 }
 
-static inline DWORD GetFileSize(HANDLE /*hFile*/, LPDWORD /*lpFileSizeHigh*/)
+static inline DWORD GetFileSize(HANDLE hFile, LPDWORD /*lpFileSizeHigh*/)
 {
-    return 0xFFFFFFFF; // INVALID_FILE_SIZE
+    int fd = _handle_to_fd(hFile);
+    if (fd < 0) return 0xFFFFFFFF;
+    struct stat st;
+    if (fstat(fd, &st) != 0) return 0xFFFFFFFF;
+    return (DWORD)st.st_size;
 }
 
 static inline DWORD GetFullPathName(LPCSTR lpFileName, DWORD nBufferLength,
@@ -870,18 +902,28 @@ static inline DWORD GetFullPathName(LPCSTR lpFileName, DWORD nBufferLength,
     return lpFileName ? (DWORD)strlen(lpFileName) : 0;
 }
 
-static inline BOOL ReadFile(HANDLE /*hFile*/, LPVOID /*lpBuffer*/,
-    DWORD /*nNumberOfBytesToRead*/, LPDWORD /*lpNumberOfBytesRead*/,
+static inline BOOL ReadFile(HANDLE hFile, LPVOID lpBuffer,
+    DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead,
     LPOVERLAPPED /*lpOverlapped*/)
 {
-    return FALSE;
+    int fd = _handle_to_fd(hFile);
+    if (fd < 0) return FALSE;
+    ssize_t n = read(fd, lpBuffer, nNumberOfBytesToRead);
+    if (n < 0) { if (lpNumberOfBytesRead) *lpNumberOfBytesRead = 0; return FALSE; }
+    if (lpNumberOfBytesRead) *lpNumberOfBytesRead = (DWORD)n;
+    return TRUE;
 }
 
-static inline BOOL WriteFile(HANDLE /*hFile*/, LPCVOID /*lpBuffer*/,
-    DWORD /*nNumberOfBytesToWrite*/, LPDWORD /*lpNumberOfBytesWritten*/,
+static inline BOOL WriteFile(HANDLE hFile, LPCVOID lpBuffer,
+    DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten,
     LPOVERLAPPED /*lpOverlapped*/)
 {
-    return FALSE;
+    int fd = _handle_to_fd(hFile);
+    if (fd < 0) return FALSE;
+    ssize_t n = write(fd, lpBuffer, nNumberOfBytesToWrite);
+    if (n < 0) { if (lpNumberOfBytesWritten) *lpNumberOfBytesWritten = 0; return FALSE; }
+    if (lpNumberOfBytesWritten) *lpNumberOfBytesWritten = (DWORD)n;
+    return TRUE;
 }
 
 // -----------------------------------------------------------------------
@@ -1136,7 +1178,12 @@ static inline DWORD WaitForSingleObject(HANDLE /*hHandle*/, DWORD /*dwMillisecon
 
 static inline BOOL SetEvent(HANDLE /*hEvent*/) { return TRUE; }
 static inline BOOL ResetEvent(HANDLE /*hEvent*/) { return TRUE; }
-static inline BOOL CloseHandle(HANDLE /*hObject*/) { return TRUE; }
+static inline BOOL CloseHandle(HANDLE hObject)
+{
+    int fd = _handle_to_fd(hObject);
+    if (fd >= 0) close(fd);
+    return TRUE;
+}
 static inline HANDLE CreateEvent(LPSECURITY_ATTRIBUTES /*lpEventAttributes*/,
     BOOL /*bManualReset*/, BOOL /*bInitialState*/, LPCSTR /*lpName*/)
 {
