@@ -2,12 +2,14 @@
 
 #include "StdAfx.h"
 #include "FrameBase.h"
+#include "libretro.h"
 
 #include <vector>
+#include <memory>
 #include <string>
 
-// LibretroSoundBuffer - stub SoundBuffer impl that discards audio
-// (real audio mixing is done separately via libretro audio callbacks)
+// LibretroSoundBuffer - SoundBuffer impl that captures audio written via Lock/Unlock
+// into a linear drain buffer for later retrieval by the libretro audio callback.
 #include "SoundBuffer.h"
 
 class LibretroSoundBuffer : public SoundBuffer
@@ -31,12 +33,16 @@ public:
     virtual HRESULT GetStatus(LPDWORD lpdwStatus) override;
     virtual HRESULT Restore() override;
 
+    // Move-drain: returns accumulated samples since last drain and resets buffer.
+    std::vector<short> DrainAudio();
+
 private:
-    std::vector<uint8_t> m_buffer;
+    std::vector<uint8_t> m_buffer;  // ring buffer (used for play/write cursor tracking)
     DWORD m_writePos;
     DWORD m_playPos;
     LONG  m_volume;
     DWORD m_status;
+    std::vector<short> m_drainBuffer;  // linear accumulator of samples written via Unlock
 };
 
 // Forward declaration
@@ -81,6 +87,10 @@ public:
                                                                int nChannels,
                                                                const char* pszVoiceName) override;
 
+    // Drain audio from all non-speaker sound buffers (Mockingboard etc.)
+    // and submit to the libretro audio batch callback.
+    void DrainAllAudio(retro_audio_sample_batch_t cb);
+
     virtual BYTE* GetResource(WORD id, LPCSTR lpType, uint32_t expectedSize) override;
     virtual void  Restart() override;
     virtual std::string Video_GetScreenShotFolder() const override;
@@ -89,6 +99,8 @@ private:
     std::string m_systemDir;
     std::vector<uint8_t> m_resourceCache;
     std::vector<uint8_t> m_framebuffer; // BGRA framebuffer
+    std::vector<std::weak_ptr<LibretroSoundBuffer>> m_soundBuffers;
+    std::vector<short> m_mixBuf;
 
     const char* ResourceIdToFilename(WORD id);
 };

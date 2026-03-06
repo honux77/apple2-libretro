@@ -1,0 +1,31 @@
+## Apple II libretro core info
+
+display_name = "Apple II (apple2-libretro)"
+categories = "Emulator"
+authors = "AppleWin Team|libretro port"
+corename = "apple2"
+supported_extensions = "dsk|do|po|nib|woz|2mg|img|gz|hdv"
+license = "GPLv2"
+permissions = ""
+display_version = "1.0"
+
+manufacturer = "Apple"
+systemname = "Apple II"
+systemid = "apple2"
+
+savestate = "false"
+savestate_features = "basic"
+cheats = "false"
+input_descriptors = "false"
+memory_descriptors = "false"
+libretro_saves = "false"
+core_options = "false"
+load_subsystem = "false"
+supports_no_game = "true"
+single_purpose = "false"
+hw_render = "false"
+needs_fullpath = "true"
+disk_control = "false"
+is_experimental = "false"
+
+description = "Apple IIe Enhanced emulator based on AppleWin 1.31. Supports DSK, PO, NIB, WOZ, and other disk image formats."

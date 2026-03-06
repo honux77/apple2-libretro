@@ -36,3 +36,4 @@ void    SpkrSaveSnapshot(class YamlSaveHelper& yamlSaveHelper);
 void    SpkrLoadSnapshot(class YamlLoadHelper& yamlLoadHelper);
 
 BYTE __stdcall SpkrToggle (WORD pc, WORD addr, BYTE bWrite, BYTE d, ULONG nExecutedCycles);
+ULONG SpkrDrainBuffer(short** ppBuffer);

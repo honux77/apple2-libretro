@@ -72,6 +72,19 @@ libretro 프론트엔드의 **system 디렉토리** 아래 `apple2/` 폴더에 R
 
 ---
 
+## 설치
+
+```bash
+# macOS
+cp apple2_libretro.dylib ~/Library/Application\ Support/RetroArch/cores/
+cp apple2_libretro.info  ~/Library/Application\ Support/RetroArch/info/
+# RetroArch 재시작 시 캐시 자동 갱신 (또는 info/core_info.cache 삭제)
+```
+
+`.info` 파일이 없으면 RetroArch에서 DSK 파일을 직접 로드할 때 코어 선택 목록에 나타나지 않습니다.
+
+---
+
 ## 사용법 (RetroArch 기준)
 
 ```bash

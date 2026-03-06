@@ -39,3 +39,8 @@ void LibretroInterface_Destroy()
 {
     // nothing to do here
 }
+
+void LibretroFrame_DrainAllAudio(retro_audio_sample_batch_t cb)
+{
+    g_frame.DrainAllAudio(cb);
+}

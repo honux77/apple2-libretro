@@ -26,6 +26,8 @@ namespace Apple2Core {
     unsigned GetHeight();
     void KeyPress(uint32_t character);
     void ArrowKey(int direction); // 0=left,1=right,2=up,3=down
+    void JoystickUpdate(retro_input_state_t input_cb);
+    void SetAudioBatchCb(retro_audio_sample_batch_t cb);
 }
 
 // -------------------------------------------------------------------------
@@ -70,7 +72,7 @@ RETRO_API void retro_set_environment(retro_environment_t cb)
 
 RETRO_API void retro_set_video_refresh(retro_video_refresh_t cb) { video_cb = cb; }
 RETRO_API void retro_set_audio_sample(retro_audio_sample_t cb) { audio_cb = cb; }
-RETRO_API void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; }
+RETRO_API void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; Apple2Core::SetAudioBatchCb(cb); }
 RETRO_API void retro_set_input_poll(retro_input_poll_t cb) { input_poll_cb = cb; }
 RETRO_API void retro_set_input_state(retro_input_state_t cb) { input_state_cb = cb; }
 
@@ -101,7 +103,7 @@ RETRO_API unsigned retro_api_version(void)
 RETRO_API void retro_get_system_info(struct retro_system_info* info)
 {
     memset(info, 0, sizeof(*info));
-    info->library_name     = "Apple II";
+    info->library_name     = "apple2-libretro";
     info->library_version  = "1.0";
     info->valid_extensions = "dsk|do|po|nib|woz|2mg|img|gz|hdv";
     info->need_fullpath    = true;
@@ -139,6 +141,9 @@ RETRO_API void retro_run(void)
     // Process input (Phase 6)
     // extern void libretro_input_update(retro_input_state_t cb);
     // libretro_input_update(input_state_cb);
+
+    // Joystick input
+    Apple2Core::JoystickUpdate(input_state_cb);
 
     // Run one video frame worth of emulation (Phase 2)
     Apple2Core::RunFrame();

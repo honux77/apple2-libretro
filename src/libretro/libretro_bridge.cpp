@@ -3,8 +3,8 @@
 
 #include "StdAfx.h"
 #include "libretro_bridge.h"
+#include "libretro.h"
 #include "LibretroVideo.h"
-#include "LibretroFrame.h"
 
 // AppleWin core
 #include "Core.h"
@@ -17,6 +17,8 @@
 #include "CardManager.h"
 #include "Disk.h"
 #include "Keyboard.h"
+#include "Joystick.h"
+#include "Speaker.h"
 
 #include <string.h>
 #include <stdint.h>
@@ -126,6 +128,11 @@ bool LoadDisk(const char* path)
     return true;
 }
 
+// Audio batch callback for flushing speaker samples
+static retro_audio_sample_batch_t g_audio_batch_cb = nullptr;
+
+void SetAudioBatchCb(retro_audio_sample_batch_t cb) { g_audio_batch_cb = cb; }
+
 // Run one video frame worth of 6502 cycles.
 // Mirrors linapple ContinueExecution() but without SDL/timer coupling.
 void RunFrame()
@@ -144,20 +151,6 @@ void RunFrame()
     // each scanline as the CPU runs (same as linapple's CpuExecute call)
     uint32_t dwExecutedCycles = CpuExecute((uint32_t)nCyclesToExecute, true);
 
-    // DEBUG: log cycles and PC on first few frames
-    static int s_dbgFrame = 0;
-    if (++s_dbgFrame <= 3) {
-        FILE* f = fopen("/tmp/apple2_scr.log", "a");
-        if (f) {
-            LPBYTE pc_lo = MemGetMainPtr(0xFFFC);
-            fprintf(f, "dbg frame=%d nCycles=%d executed=%u PC_reset_vec=%02X%02X mem[0400]=%02X\n",
-                s_dbgFrame, nCyclesToExecute, dwExecutedCycles,
-                pc_lo[1], pc_lo[0],
-                MemGetMainPtr(0x0400)[0]);
-            fclose(f);
-        }
-    }
-
     g_dwCyclesThisFrame += dwExecutedCycles;
     if (g_dwCyclesThisFrame >= nCyclesPerFrame)
         g_dwCyclesThisFrame -= nCyclesPerFrame;
@@ -170,45 +163,14 @@ void RunFrame()
     SpkrUpdate(dwExecutedCycles);
     GetCardMgr().GetMockingboardCardMgr().Update(dwExecutedCycles);
 
+    // Flush all audio (speaker + Mockingboard) via LibretroSoundBuffer drain
+    LibretroFrame_DrainAllAudio(g_audio_batch_cb);
+
     // Redraw the whole screen from current Apple II memory state.
     // The real-time NTSC path (bVideoUpdate=true) may miss updates;
     // this guarantees a correct frame.
     GetFrame().VideoRefreshScreen(GetVideo().GetVideoMode(), true);
 
-    // DEBUG: dump screen memory to /tmp every 60 frames
-    static int s_frameCount = 0;
-    ++s_frameCount;
-    if (s_frameCount == 1 || s_frameCount % 60 == 0) {
-        FILE* f = fopen("/tmp/apple2_scr.log", "a");
-        if (f) {
-            // Row addresses in Apple II text screen (non-linear layout)
-            const uint16_t rowAddr[] = {
-                0x0400, 0x0480, 0x0500, 0x0580, 0x0600, 0x0680, 0x0700, 0x0780,
-                0x0428, 0x04A8, 0x0528, 0x05A8, 0x0628, 0x06A8, 0x0728, 0x07A8,
-                0x0450, 0x04D0, 0x0550, 0x05D0, 0x0650, 0x06D0, 0x0750, 0x07D0
-            };
-            // Cursor position
-            LPBYTE cv = MemGetMainPtr(0x24);
-            fprintf(f, "frame=%d cursor=col%d,row%d ", s_frameCount, cv[0], cv[1]);
-            // Scan all 24 rows for non-space bytes
-            bool found = false;
-            for (int r = 0; r < 24; r++) {
-                LPBYTE row = MemGetMainPtr(rowAddr[r]);
-                for (int c = 0; c < 8; c++) {
-                    if (row[c] != 0xA0 && row[c] != 0x00) {
-                        fprintf(f, "row%d[$%04X]:", r, rowAddr[r]);
-                        for (int i = 0; i < 8; i++) fprintf(f, " %02X", row[i]);
-                        fprintf(f, " ");
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (!found) fprintf(f, "(all spaces)");
-            fprintf(f, "\n");
-            fclose(f);
-        }
-    }
 }
 
 // Return a 560x384 XRGB8888 buffer, border-stripped from the internal framebuffer.
@@ -254,6 +216,34 @@ void KeyPress(uint32_t character)
     if (!g_initialized || character == 0 || character > 127)
         return;
     KeybQueueKeypress((WPARAM)character, ASCII);
+}
+
+// Joystick: libretro analog -32768..32767 → Apple II 0..255
+void JoystickUpdate(retro_input_state_t input_cb)
+{
+    if (!g_initialized || !input_cb) return;
+
+    // --- Analog stick (port 0, left stick) ---
+    int16_t ax = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+    int16_t ay = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
+    int px = ((int)ax + 32768) * 255 / 65535;
+    int py = ((int)ay + 32768) * 255 / 65535;
+
+    // --- D-pad overrides analog if pressed ---
+    bool left  = input_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT)  != 0;
+    bool right = input_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT) != 0;
+    bool up    = input_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP)    != 0;
+    bool down  = input_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN)  != 0;
+    if (left || right) px = left ? 0 : 255;
+    if (up   || down ) py = up   ? 0 : 255;
+
+    JoySetPositionDirect(0, px, py);
+
+    // --- Buttons: B=PB0 (fire), A=PB1 ---
+    bool b0 = input_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B) != 0;
+    bool b1 = input_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A) != 0;
+    JoySetButton(BUTTON0, b0 ? BUTTON_DOWN : BUTTON_UP);
+    JoySetButton(BUTTON1, b1 ? BUTTON_DOWN : BUTTON_UP);
 }
 
 void ArrowKey(int direction) // 0=left,1=right,2=up,3=down

@@ -1030,3 +1030,13 @@ void SpkrLoadSnapshot(YamlLoadHelper& yamlLoadHelper)
 
 	yamlLoadHelper.PopMap();
 }
+
+// libretro: drain accumulated speaker samples each frame.
+// Returns number of STEREO sample pairs available; resets the index.
+ULONG SpkrDrainBuffer(short** ppBuffer)
+{
+    *ppBuffer = g_pSpeakerBuffer;
+    ULONG n = g_nBufferIdx;
+    g_nBufferIdx = 0;
+    return n;
+}

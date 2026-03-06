@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(make:*)",
+      "Read(//Users/honux/Hobby/apple2-libretro/$HOME/Library/Application Support/**)",
+      "Read(//Users/honux/Hobby/apple2-libretro/$HOME/Library/**)",
+      "Bash(ls:*)",
+      "Bash(git restore:*)",
+      "Bash(\"/Applications/RetroArch.app/Contents/MacOS/RetroArch\":*)",
+      "Bash(c++:*)",
+      "Bash(cp:*)",
+      "Bash(xxd:*)",
+      "Bash(md5:*)",
+      "Bash(7z l:*)",
+      "Bash(python3:*)",
+      "Bash(clang++:*)",
+      "Bash(open:*)",
+      "Bash(git push:*)",
+      "Bash(mdfind kMDItemFSName == ''RetroArch*'':*)",
+      "Bash(mdfind RetroArch:*)"
+    ]
+  }
+}

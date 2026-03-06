@@ -103,10 +103,41 @@ HRESULT LibretroSoundBuffer::Lock(DWORD dwWriteCursor, DWORD dwWriteBytes,
     return S_OK;
 }
 
-HRESULT LibretroSoundBuffer::Unlock(LPVOID /*lpvAudioPtr1*/, DWORD /*dwAudioBytes1*/,
-                                     LPVOID /*lpvAudioPtr2*/, DWORD /*dwAudioBytes2*/)
+HRESULT LibretroSoundBuffer::Unlock(LPVOID lpvAudioPtr1, DWORD dwAudioBytes1,
+                                     LPVOID lpvAudioPtr2, DWORD dwAudioBytes2)
 {
+    // Cap drain buffer to ~1 second of stereo audio to prevent runaway growth.
+    // This can happen when the 6522 timer period is very short (uninitialized game),
+    // causing thousands of UpdateSoundBuffer calls per frame.
+    static const size_t kMaxDrainShorts = 44100 * 2;
+
+    if (lpvAudioPtr1 && dwAudioBytes1 > 0) {
+        const short* p = static_cast<const short*>(lpvAudioPtr1);
+        size_t n = dwAudioBytes1 / sizeof(short);
+        if (m_drainBuffer.size() + n <= kMaxDrainShorts)
+            m_drainBuffer.insert(m_drainBuffer.end(), p, p + n);
+    }
+    if (lpvAudioPtr2 && dwAudioBytes2 > 0) {
+        const short* p = static_cast<const short*>(lpvAudioPtr2);
+        size_t n = dwAudioBytes2 / sizeof(short);
+        if (m_drainBuffer.size() + n <= kMaxDrainShorts)
+            m_drainBuffer.insert(m_drainBuffer.end(), p, p + n);
+    }
+    // Advance play cursor to match write cursor so callers see the buffer as
+    // always ready to accept more data (simulates hardware consuming audio instantly).
+    m_playPos = m_writePos;
     return S_OK;
+}
+
+std::vector<short> LibretroSoundBuffer::DrainAudio()
+{
+    std::vector<short> out;
+    out.swap(m_drainBuffer);
+    // Hard safety cap: never return more than 1 second of stereo audio
+    static const size_t kMaxShorts = 44100 * 2;
+    if (out.size() > kMaxShorts)
+        out.resize(kMaxShorts);
+    return out;
 }
 
 HRESULT LibretroSoundBuffer::Stop()
@@ -247,7 +278,53 @@ std::shared_ptr<SoundBuffer> LibretroFrame::CreateSoundBuffer(uint32_t dwBufferS
                                                                int nChannels,
                                                                const char* /*pszVoiceName*/)
 {
-    return std::make_shared<LibretroSoundBuffer>(dwBufferSize, nSampleRate, nChannels);
+    auto buf = std::make_shared<LibretroSoundBuffer>(dwBufferSize, nSampleRate, nChannels);
+    m_soundBuffers.push_back(buf);
+    return buf;
+}
+
+void LibretroFrame::DrainAllAudio(retro_audio_sample_batch_t cb)
+{
+    if (!cb) return;
+
+    // Mix all sound buffers (speaker + Mockingboard + ...) into one output batch.
+    // Submitting them separately would send 2x the expected samples per frame,
+    // causing RetroArch audio throttling and half-speed emulation.
+    m_mixBuf.clear();
+
+    auto it = m_soundBuffers.begin();
+    while (it != m_soundBuffers.end()) {
+        auto sp = it->lock();
+        if (!sp) {
+            it = m_soundBuffers.erase(it);
+            continue;
+        }
+
+        std::vector<short> chunk = sp->DrainAudio();
+        DWORD nShorts = (DWORD)chunk.size();
+
+        // Clamp to 1 frame of stereo audio (44100/60 * 2 ≈ 1470 shorts)
+        static const DWORD kMaxFrameShorts = 44100 / 30 * 2; // generous 2-frame budget
+        if (nShorts > kMaxFrameShorts)
+            nShorts = kMaxFrameShorts;
+
+        if (nShorts > 0) {
+            if (m_mixBuf.size() < nShorts)
+                m_mixBuf.resize(nShorts, 0);
+
+            for (DWORD i = 0; i < nShorts; i++) {
+                int32_t v = (int32_t)m_mixBuf[i] + (int32_t)chunk[i];
+                if (v >  32767) v =  32767;
+                if (v < -32768) v = -32768;
+                m_mixBuf[i] = (short)v;
+            }
+        }
+
+        ++it;
+    }
+
+    if (m_mixBuf.size() >= 2)
+        cb(m_mixBuf.data(), m_mixBuf.size() / 2);
 }
 
 const char* LibretroFrame::ResourceIdToFilename(WORD id)

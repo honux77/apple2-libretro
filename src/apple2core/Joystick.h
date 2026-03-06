@@ -12,6 +12,7 @@ void    JoyInitialize();
 BOOL    JoyProcessKey(int,bool,bool,bool);
 void    JoyReset();
 void    JoySetButton(eBUTTON,eBUTTONSTATE);
+void    JoySetPositionDirect(int joyNum, int x, int y);
 BOOL    JoySetEmulationType(HWND,uint32_t,int, const bool bMousecardActive);
 void    JoySetPosition(int,int,int,int);
 BOOL    JoyUsingMouse();

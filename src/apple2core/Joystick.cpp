@@ -1085,3 +1085,11 @@ void JoyLoadSnapshot(YamlLoadHelper& yamlLoadHelper, UINT version)
 
 	yamlLoadHelper.PopMap();
 }
+
+// libretro: set joystick axis directly (0=joy0, 1=joy1; x,y in 0..255)
+void JoySetPositionDirect(int joyNum, int x, int y)
+{
+    if (joyNum < 0 || joyNum > 1) return;
+    xpos[joyNum] = x;
+    ypos[joyNum] = y;
+}
