@@ -178,8 +178,9 @@ void LibretroFrame::Initialize(bool resetVideoState)
     if (w == 0 || h == 0)
     {
         // Defaults before Video::Initialize() is called
-        w = 560 + 2 * 4; // border
-        h = 384 + 2 * 4;
+        // Full NTSC framebuffer: 560 + 2*20 border = 600, 384 + 2*18 border = 420
+        w = 600;
+        h = 420;
     }
     m_framebuffer.assign((size_t)w * h * 4, 0);
     video.Initialize(m_framebuffer.data(), resetVideoState);

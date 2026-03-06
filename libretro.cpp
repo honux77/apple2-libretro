@@ -13,6 +13,7 @@ static retro_audio_sample_batch_t audio_batch_cb = nullptr;
 static retro_environment_t environ_cb = nullptr;
 static retro_input_poll_t input_poll_cb = nullptr;
 static retro_input_state_t input_state_cb = nullptr;
+static retro_log_printf_t log_cb = nullptr;
 
 // Forward declarations (Phase 2+)
 namespace Apple2Core {
@@ -23,11 +24,31 @@ namespace Apple2Core {
     const uint32_t* GetFramebuffer();
     unsigned GetWidth();
     unsigned GetHeight();
+    void KeyPress(uint32_t character);
+    void ArrowKey(int direction); // 0=left,1=right,2=up,3=down
 }
 
 // -------------------------------------------------------------------------
 // libretro API
 // -------------------------------------------------------------------------
+
+static void keyboard_cb(bool down, unsigned keycode, uint32_t character, uint16_t /*key_modifiers*/)
+{
+    if (!down) return;
+
+    // Arrow keys mapped to Apple IIe control codes
+    switch (keycode) {
+    case 276: Apple2Core::ArrowKey(0); return; // RETROK_LEFT  → ctrl-H (0x08)
+    case 275: Apple2Core::ArrowKey(1); return; // RETROK_RIGHT → ctrl-U (0x15)
+    case 273: Apple2Core::ArrowKey(2); return; // RETROK_UP    → ctrl-K (0x0B)
+    case 274: Apple2Core::ArrowKey(3); return; // RETROK_DOWN  → ctrl-J (0x0A)
+    default: break;
+    }
+
+    // Printable and control characters (1–127)
+    if (character >= 1 && character <= 127)
+        Apple2Core::KeyPress(character);
+}
 
 RETRO_API void retro_set_environment(retro_environment_t cb)
 {
@@ -36,6 +57,15 @@ RETRO_API void retro_set_environment(retro_environment_t cb)
     // Can run without a disk (boots to Applesoft BASIC prompt)
     bool no_game = true;
     cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
+
+    // Register keyboard event callback
+    struct retro_keyboard_callback kb = { keyboard_cb };
+    cb(RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK, &kb);
+
+    // Get log callback
+    struct retro_log_callback logging;
+    if (cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &logging))
+        log_cb = logging.log;
 }
 
 RETRO_API void retro_set_video_refresh(retro_video_refresh_t cb) { video_cb = cb; }
@@ -85,7 +115,7 @@ RETRO_API void retro_get_system_av_info(struct retro_system_av_info* info)
     info->geometry.base_height  = Apple2Core::GetHeight();
     info->geometry.max_width    = Apple2Core::GetWidth();
     info->geometry.max_height   = Apple2Core::GetHeight();
-    info->geometry.aspect_ratio = (float)Apple2Core::GetWidth() / (float)Apple2Core::GetHeight();
+    info->geometry.aspect_ratio = 4.0f / 3.0f;  // Apple II NTSC display is 4:3
     info->timing.fps            = 60.0;
     info->timing.sample_rate    = 44100.0;
 }
