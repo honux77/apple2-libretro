@@ -29,13 +29,14 @@ sudo apt install build-essential libz-dev libpcap-dev
 
 ```bash
 make -f Makefile.libretro
-# 결과: apple2_libretro.so
+# 결과: apple2_libretro.so (Linux) / apple2_libretro.dylib (macOS)
 ```
 
-플랫폼 지정 (Raspberry Pi 등):
+플랫폼 지정:
 
 ```bash
-make -f Makefile.libretro platform=rpi3
+make -f Makefile.libretro platform=osx   # macOS
+make -f Makefile.libretro platform=rpi3  # Raspberry Pi 3
 ```
 
 ---
@@ -74,8 +75,23 @@ libretro 프론트엔드의 **system 디렉토리** 아래 `apple2/` 폴더에 R
 ## 사용법 (RetroArch 기준)
 
 ```bash
+# Linux
 retroarch -L apple2_libretro.so game.dsk
+
+# macOS (no-game: Applesoft BASIC 프롬프트로 부팅)
+retroarch -L apple2_libretro.dylib
 ```
+
+### ROM 파일 주의사항
+
+`Apple2e_Enhanced.rom` (16KB)는 두 개의 8KB 칩 덤프를 **e10 + e8** 순서로 이어 붙인 파일이어야 합니다.
+
+| 칩 | 파트번호 | 내용 | 메모리 영역 |
+|----|----------|------|-------------|
+| E10 | 342-0304-A | Applesoft BASIC | $D000–$DFFF (앞 4KB) + $E000–$EFFF (뒤 4KB) |
+| E8 | 342-0303-A | 시스템/모니터 ROM | $E000–$FFFF |
+
+순서가 **e8 + e10**으로 되어 있으면 리셋 벡터($FFFC)가 잘못된 주소를 가리켜 부팅되지 않습니다.
 
 ---
 
@@ -98,7 +114,7 @@ apple2-libretro/
 │   │   ├── LibretroPropertySheet.cpp
 │   │   ├── LibretroPropertySheet.h
 │   │   ├── libretro_audio.cpp    # 오디오 출력 (미구현)
-│   │   └── libretro_input.cpp    # 입력 처리 (미구현)
+│   │   └── libretro_input.cpp    # 조이스틱/패들 입력 (미구현)
 │   └── apple2core/               # AppleWin 1.31 에뮬레이터 코어
 │       ├── CPU.cpp / CPU.h       # 6502/65C02 CPU
 │       ├── Memory.cpp / Memory.h # 메모리 맵, ROM 로딩
@@ -124,9 +140,9 @@ apple2-libretro/
 
 | 단계 | 내용 | 상태 |
 |------|------|------|
-| Phase 1 | 빌드 시스템 구성, Linux 스텁 추가 | ✅ 완료 |
+| Phase 1 | 빌드 시스템 구성, macOS/Linux 스텁 추가 | ✅ 완료 |
 | Phase 2 | 에뮬레이터 코어 연결 (CPU/메모리/비디오/디스크) | ✅ 완료 |
-| Phase 3 | 키보드 입력 | 🔲 미구현 |
+| Phase 3 | 키보드 입력 (`RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK`) | ✅ 완료 |
 | Phase 4 | 조이스틱/패들 입력 | 🔲 미구현 |
 | Phase 5 | 오디오 출력 (스피커 / 목킹보드) | 🔲 미구현 |
 | Phase 6 | Save State | 🔲 미구현 |
